@@ -4,17 +4,17 @@ import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { CardContent } from '@/components/ui/card';
-import { ModelSelector } from '@/components/ui/llm-selector';
 import { useFlowContext } from '@/contexts/flow-context';
 import { useNodeContext } from '@/contexts/node-context';
-import { getDefaultModel, getModels, LanguageModel } from '@/data/models';
-import { useNodeState } from '@/hooks/use-node-state';
+import { LanguageModel } from '@/data/models';
 import { useOutputNodeConnection } from '@/hooks/use-output-node-connection';
 import { cn } from '@/lib/utils';
 import { type PortfolioManagerNode } from '../types';
 import { getStatusColor } from '../utils';
 import { InvestmentReportDialog } from './investment-report-dialog';
 import { NodeShell } from './node-shell';
+
+const FIXED_MODEL: LanguageModel = { display_name: "GPT-4.1", model_name: "gpt-4.1", provider: "OpenAI" };
 
 export function PortfolioManagerNode({
   data,
@@ -23,9 +23,8 @@ export function PortfolioManagerNode({
   isConnectable,
 }: NodeProps<PortfolioManagerNode>) {
   const { currentFlowId } = useFlowContext();
-  const { getAgentNodeDataForFlow, setAgentModel, getAgentModel, getOutputNodeDataForFlow } = useNodeContext();
+  const { getAgentNodeDataForFlow, setAgentModel, getOutputNodeDataForFlow } = useNodeContext();
 
-  // Get agent node data for the current flow
   const agentNodeData = getAgentNodeDataForFlow(currentFlowId?.toString() || null);
   const nodeData = agentNodeData[id] || {
     status: 'IDLE',
@@ -38,57 +37,13 @@ export function PortfolioManagerNode({
   const isInProgress = status === 'IN_PROGRESS';
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Use persistent state hooks
-  const [availableModels, setAvailableModels] = useNodeState<LanguageModel[]>(
-    id,
-    'availableModels',
-    []
-  );
-  const [selectedModel, setSelectedModel] = useNodeState<LanguageModel | null>(
-    id,
-    'selectedModel',
-    null
-  );
-
-  // Load models on mount
-  useEffect(() => {
-    const loadModels = async () => {
-      try {
-        const [models, defaultModel] = await Promise.all([
-          getModels(),
-          getDefaultModel()
-        ]);
-        setAvailableModels(models);
-        
-        // Set default model if no model is currently selected
-        if (!selectedModel && defaultModel) {
-          setSelectedModel(defaultModel);
-        }
-      } catch (error) {
-        console.error('Failed to load models:', error);
-        // Keep empty array as fallback
-      }
-    };
-
-    loadModels();
-  }, [setAvailableModels, selectedModel, setSelectedModel]);
-
-  // Update the node context when the model changes
+  // Set fixed model on mount
   useEffect(() => {
     const flowId = currentFlowId?.toString() || null;
-    const currentContextModel = getAgentModel(flowId, id);
-    if (selectedModel !== currentContextModel) {
-      setAgentModel(flowId, id, selectedModel);
-    }
-  }, [selectedModel, id, currentFlowId, setAgentModel, getAgentModel]);
+    setAgentModel(flowId, id, FIXED_MODEL);
+  }, [id, currentFlowId, setAgentModel]);
 
-  const handleModelChange = (model: LanguageModel | null) => {
-    setSelectedModel(model);
-  };
-  
   const outputNodeData = getOutputNodeDataForFlow(currentFlowId?.toString() || null);
-
-  // Get connected agent IDs
   const { connectedAgentIds } = useOutputNodeConnection(id);
 
   return (
@@ -132,17 +87,6 @@ export function PortfolioManagerNode({
                     View Investment Report
                   </Button>
                 )}
-              </div>
-              <div className="flex flex-col gap-2">
-                <div className="text-subtitle text-primary flex items-center gap-1">
-                  Model
-                </div>
-                <ModelSelector
-                  models={availableModels}
-                  value={selectedModel?.model_name || ''}
-                  onChange={handleModelChange}
-                  placeholder="Auto"
-                />
               </div>
             </div>
           </div>
