@@ -142,74 +142,94 @@ export function useFlowManagement(): UseFlowManagementReturn {
     }
   }, [loadFlow]);
 
+  // Default flow nodes and edges - loaded fresh every time
+  const defaultNodes = [
+    {
+      id: "portfolio-start-node_default",
+      type: "portfolio-start-node",
+      position: { x: 0, y: 0 },
+      data: { name: "Portfolio Input", description: "Enter your portfolio including tickers, shares, and prices. Connect this node to Analysts to generate insights.", status: "Idle" },
+    },
+    {
+      id: "technical_analyst_default",
+      type: "agent-node",
+      position: { x: 450, y: -550 },
+      data: { name: "Technical Analyst", description: "Analyzes price patterns, trends, and technical indicators.", status: "Idle" },
+    },
+    {
+      id: "fundamentals_analyst_default",
+      type: "agent-node",
+      position: { x: 450, y: -200 },
+      data: { name: "Fundamentals Analyst", description: "Analyzes financial statements, ratios, and company fundamentals.", status: "Idle" },
+    },
+    {
+      id: "sentiment_analyst_default",
+      type: "agent-node",
+      position: { x: 450, y: 150 },
+      data: { name: "Sentiment Analyst", description: "Analyzes market sentiment from news, social media, and other sources.", status: "Idle" },
+    },
+    {
+      id: "valuation_analyst_default",
+      type: "agent-node",
+      position: { x: 450, y: 500 },
+      data: { name: "Valuation Analyst", description: "Analyzes intrinsic value using DCF, comparables, and other valuation methods.", status: "Idle" },
+    },
+    {
+      id: "portfolio_manager_default",
+      type: "portfolio-manager-node",
+      position: { x: 900, y: 0 },
+      data: { name: "Portfolio Manager", description: "Generates investment decisions based on input from Analysts.", status: "Idle" },
+    },
+  ];
+
+  const defaultEdges = [
+    { id: "e1", source: "portfolio-start-node_default", target: "technical_analyst_default" },
+    { id: "e2", source: "portfolio-start-node_default", target: "fundamentals_analyst_default" },
+    { id: "e3", source: "portfolio-start-node_default", target: "sentiment_analyst_default" },
+    { id: "e4", source: "portfolio-start-node_default", target: "valuation_analyst_default" },
+    { id: "e5", source: "technical_analyst_default", target: "portfolio_manager_default" },
+    { id: "e6", source: "fundamentals_analyst_default", target: "portfolio_manager_default" },
+    { id: "e7", source: "sentiment_analyst_default", target: "portfolio_manager_default" },
+    { id: "e8", source: "valuation_analyst_default", target: "portfolio_manager_default" },
+  ];
+
   // Create default flow for new users
   const createDefaultFlow = useCallback(async () => {
     try {
-      console.log('Creating default flow for new user...');
-      // Get current React Flow state, fallback to empty arrays if nothing exists
-      const nodes = reactFlowInstance?.getNodes() || [];
-      const edges = reactFlowInstance?.getEdges() || [];
-      const viewport = reactFlowInstance?.getViewport() || { x: 0, y: 0, zoom: 1 };
-      
-      const defaultFlow = await flowService.createDefaultFlow(nodes, edges, viewport);
-      console.log('Default flow created:', defaultFlow);
-      setFlows([defaultFlow]);
-      
-      // Set the flow ID for node state isolation before loading
-      setNodeStateFlowId(defaultFlow.id.toString());
-      await loadFlowWithStates(defaultFlow);
-      console.log('Default flow loaded successfully');
+      console.log('Loading default flow locally...');
+      const localFlow: Flow = {
+        id: 1,
+        name: 'AI Hedge Fund',
+        description: 'Pre-built flow with 4 analysts and a portfolio manager.',
+        nodes: defaultNodes,
+        edges: defaultEdges,
+        viewport: { x: 100, y: 300, zoom: 0.7 },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_template: false,
+      };
+      setFlows([localFlow]);
+      setNodeStateFlowId('1');
+      reactFlowInstance.setNodes(defaultNodes);
+      reactFlowInstance.setEdges(defaultEdges);
+      reactFlowInstance.setViewport({ x: 100, y: 300, zoom: 0.7 });
+      console.log('Default flow loaded locally');
     } catch (error) {
       console.error('Failed to create default flow:', error);
     }
-  }, [reactFlowInstance, loadFlowWithStates]);
+  }, [reactFlowInstance]);
 
-  // Load flows from API
+  // Load flows - always start fresh with default flow
   const loadFlows = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log('Loading flows from API...');
-      const flowsData = await flowService.getFlows();
-      console.log('Loaded flows:', flowsData);
-      setFlows(flowsData);
-      
-      if (flowsData.length === 0) {
-        // Create default flow if user has no flows
-        console.log('No flows found, creating default flow...');
-        await createDefaultFlow();
-      } else {
-        // Try to restore the last selected flow from localStorage
-        const lastSelectedFlowId = localStorage.getItem('lastSelectedFlowId');
-        let flowToLoad = null;
-
-        if (lastSelectedFlowId) {
-          // Try to find the last selected flow
-          flowToLoad = flowsData.find(flow => flow.id === parseInt(lastSelectedFlowId));
-          if (flowToLoad) {
-            console.log('Restoring last selected flow:', flowToLoad.name);
-          }
-        }
-
-        // If no last selected flow or it doesn't exist anymore, use the most recent
-        if (!flowToLoad) {
-          flowToLoad = flowsData.reduce((latest, current) => {
-            const latestDate = new Date(latest.updated_at || latest.created_at);
-            const currentDate = new Date(current.updated_at || current.created_at);
-            return currentDate > latestDate ? current : latest;
-          });
-          console.log('Loading most recent flow:', flowToLoad.name);
-        }
-
-        // Fetch the full flow data before loading
-        const fullFlow = await flowService.getFlow(flowToLoad.id);
-        await loadFlowWithStates(fullFlow);
-      }
+      await createDefaultFlow();
     } catch (error) {
       console.error('Error loading flows:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [createDefaultFlow, loadFlowWithStates]);
+  }, [createDefaultFlow]);
 
   // Load flows on mount
   useEffect(() => {
