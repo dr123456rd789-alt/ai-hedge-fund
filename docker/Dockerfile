@@ -18,5 +18,8 @@ RUN poetry config virtualenvs.create false \
 # Copy rest of the source code
 COPY . /app/
 
-# Default command (will be overridden by Docker Compose)
-CMD ["python", "src/main.py"] 
+# Expose port for Railway
+EXPOSE ${PORT:-8000}
+
+# Start FastAPI server (Railway injects PORT env var)
+CMD uvicorn app.backend.main:app --host 0.0.0.0 --port ${PORT:-8000}
